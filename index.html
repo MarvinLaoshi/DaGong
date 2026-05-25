@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>打工计时器</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f2f2f6;
+      --surface: #ffffff;
+      --surface2: #f0f0f4;
+      --border: #e0e0ea;
+      --text: #1a1a28;
+      --text-dim: #8888a0;
+      --text-dimmer: #c0c0d0;
+      --accent: #3a7fff;
+      --accent-light: rgba(58,127,255,0.10);
+      --warning: #d07a00;
+      --warning-light: rgba(208,122,0,0.10);
+      --success: #1aaa5c;
+      --success-light: rgba(26,170,92,0.12);
+      --danger: #e03040;
+      --danger-light: rgba(224,48,64,0.10);
+      --shadow: 0 2px 16px rgba(0,0,0,0.07);
+      --shadow-lg: 0 8px 40px rgba(0,0,0,0.11);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body {
+      width:100%; height:100%;
+      background:var(--bg);
+      color:var(--text);
+      font-family:-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+      overflow:hidden;
+      user-select:none; -webkit-user-select:none;
+    }
+
+    .screen {
+      position:fixed; inset:0;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      padding:28px 24px;
+      opacity:0; transform:translateY(14px);
+      transition:opacity .4s ease, transform .4s ease;
+      pointer-events:none;
+      overflow-y:auto;
+    }
+    .screen.active { opacity:1; transform:translateY(0); pointer-events:all; }
+
+    /* ────── WELCOME ────── */
+    #s-welcome { gap:20px; }
+    .welcome-emoji { font-size:64px; line-height:1; }
+    .welcome-greeting { font-size:26px; font-weight:300; text-align:center; line-height:1.5; }
+    .welcome-name { font-weight:600; color:var(--accent); }
+    .welcome-sub { font-size:14px; color:var(--text-dim); text-align:center; line-height:1.9; }
+    .btn-welcome { width:100%; max-width:320px; padding:18px; background:var(--accent); border:none; border-radius:14px; color:#fff; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 4px 20px rgba(58,127,255,0.28); transition:opacity .2s,transform .1s; }
+    .btn-welcome:active { transform:scale(.97); opacity:.9; }
+
+    /* ────── IDLE ────── */
+    #s-idle { gap:24px; }
+    .badge {
+      display:inline-block; padding:5px 14px;
+      background:var(--accent-light); border-radius:20px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:10px; letter-spacing:2px; color:var(--accent); text-transform:uppercase;
+    }
+    .idle-title { font-size:28px; font-weight:300; letter-spacing:-.5px; line-height:1.4; text-align:center; }
+    .idle-sub { font-size:14px; color:var(--text-dim); line-height:1.9; text-align:center; }
+    .card { width:100%; max-width:320px; background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:22px 20px; }
+    .input-label {
+      font-family:'JetBrains Mono',monospace;
+      font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px;
+    }
+    .time-input {
+      width:100%; background:var(--surface2); border:1.5px solid var(--border); border-radius:10px;
+      padding:15px; text-align:center; color:var(--text);
+      font-family:'JetBrains Mono',monospace; font-size:34px; font-weight:300;
+      letter-spacing:4px; outline:none;
+      transition:border-color .2s, box-shadow .2s;
+      -webkit-appearance:none; appearance:none;
+    }
+    .time-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-light); }
+    .time-input::-webkit-calendar-picker-indicator { display:none; }
+    .btn-start {
+      width:100%; max-width:320px; padding:18px;
+      background:var(--accent); border:none; border-radius:14px;
+      color:#fff; font-size:17px; font-weight:700; letter-spacing:.5px; cursor:pointer;
+      box-shadow:0 4px 20px rgba(58,127,255,0.28); transition:opacity .2s, transform .1s;
+    }
+    .btn-start:active { transform:scale(.97); opacity:.9; }
+    .idle-foot { font-size:12px; color:var(--text-dimmer); line-height:2; text-align:center; }
+
+    /* ────── WORKING ────── */
+    #s-working { justify-content:center; padding-top:44px; padding-bottom:32px; gap:0; }
+    .w-top { display:flex; align-items:center; gap:8px; margin-bottom:20px; }
+    .w-dot { width:7px; height:7px; border-radius:50%; background:var(--success); animation:blink 2.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+    .w-status { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2.5px; color:var(--text-dim); text-transform:uppercase; }
+    .w-elapsed-block { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+    .w-elapsed-label { font-size:15px; font-weight:500; color:var(--text-dim); letter-spacing:1.5px; }
+    .w-elapsed-card { background:var(--surface); border-radius:24px; padding:24px 20px 20px; box-shadow:var(--shadow-lg); text-align:center; width:100%; max-width:320px; }
+    .w-elapsed-num { font-family:'JetBrains Mono',monospace; font-size:clamp(36px,12vw,52px); font-weight:300; letter-spacing:-2px; line-height:1; color:var(--text); }
+    .w-elapsed-num .colon { opacity:.25; }
+    .w-elapsed-unit-row { display:flex; justify-content:space-around; margin-top:10px; padding:0 4px; }
+    .w-elapsed-unit-row span { font-size:13px; color:var(--text-dimmer); letter-spacing:1px; width:33%; text-align:center; }
+    .w-sep { width:100%; max-width:320px; height:1px; background:var(--border); margin:14px 0; }
+    .w-remaining-block { display:flex; flex-direction:column; align-items:center; gap:6px; width:100%; max-width:320px; }
+    .w-rem-label { font-size:14px; color:var(--text-dim); letter-spacing:1px; font-weight:400; }
+    .w-rem-pill { background:var(--accent-light); border-radius:100px; padding:10px 28px; display:flex; align-items:baseline; gap:4px; }
+    .w-rem-num { font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:300; color:var(--accent); letter-spacing:-1px; transition:color .4s; }
+    .w-rem-unit { font-size:13px; color:var(--accent); opacity:.6; transition:color .4s; }
+    .w-bottom { text-align:center; margin-top:16px; }
+    .w-clock { font-family:'JetBrains Mono',monospace; font-size:16px; color:var(--text-dim); letter-spacing:2px; }
+    .w-quote { margin-top:8px; font-size:14px; color:var(--text-dim); font-style:italic; }
+    .w-action-row { display:flex; gap:10px; width:100%; max-width:320px; margin-top:18px; }
+    .btn-early { flex:1; padding:13px; background:transparent; border:1.5px solid var(--border); border-radius:12px; color:var(--text-dim); font-size:14px; cursor:pointer; transition:border-color .2s,color .2s; }
+    .btn-early:active { border-color:var(--danger); color:var(--danger); }
+    .btn-change-time { flex:1; padding:13px; background:transparent; border:1.5px solid var(--border); border-radius:12px; color:var(--text-dim); font-size:14px; cursor:pointer; transition:border-color .2s,color .2s; }
+    .btn-change-time:active { border-color:var(--accent); color:var(--accent); }
+
+    /* ────── FINISHED ────── */
+    #s-finished { gap:14px; padding:44px 24px; justify-content:flex-start; }
+    .fin-icon { font-size:48px; line-height:1; margin-top:8px; }
+    .fin-eye { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--text-dim); text-transform:uppercase; }
+    .fin-dur { font-family:'JetBrains Mono',monospace; font-size:48px; font-weight:300; letter-spacing:-2px; line-height:1; text-align:center; }
+    .fin-dur-l { font-size:12px; color:var(--text-dim); margin-top:-6px; }
+    .fin-card { width:100%; max-width:320px; background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:18px 20px; text-align:center; }
+    .fin-num { font-family:'JetBrains Mono',monospace; font-size:36px; font-weight:700; color:var(--accent); letter-spacing:-1px; }
+    .fin-stat { font-size:14px; color:var(--text-dim); margin-top:6px; line-height:1.8; }
+    .fin-slogan { font-size:13px; color:var(--text-dimmer); font-style:italic; text-align:center; max-width:270px; line-height:2; white-space:pre-line; }
+
+    .fin-actions { display:flex; gap:10px; width:100%; max-width:320px; }
+    .btn-reset { flex:1; padding:13px; background:transparent; border:1.5px solid var(--border); border-radius:12px; color:var(--text-dim); font-size:14px; cursor:pointer; transition:border-color .2s,color .2s; }
+    .btn-reset:active { border-color:var(--text); color:var(--text); }
+    .btn-rank { flex:1; padding:13px; background:var(--accent-light); border:1.5px solid var(--accent); border-radius:12px; color:var(--accent); font-size:14px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-rank:active { background:var(--accent); color:#fff; }
+
+    /* ────── LEADERBOARD SCREEN ────── */
+    #s-rank { justify-content:flex-start; padding:52px 24px 32px; gap:14px; overflow-y:auto; }
+    .rank-header { display:flex; align-items:center; gap:10px; width:100%; max-width:320px; }
+    .btn-back { background:none; border:none; font-size:22px; cursor:pointer; padding:4px; color:var(--text-dim); }
+    .rank-title { font-size:18px; font-weight:600; }
+    .rank-sub { font-size:12px; color:var(--text-dimmer); letter-spacing:1px; }
+    .rank-list { width:100%; max-width:320px; display:flex; flex-direction:column; gap:8px; }
+    .rank-item {
+      background:var(--surface); border-radius:14px;
+      padding:14px 16px; display:flex; align-items:center; gap:12px;
+      box-shadow:var(--shadow);
+    }
+    .rank-item.me { border:1.5px solid var(--accent); background:var(--accent-light); }
+    .rank-num { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; color:var(--text-dimmer); min-width:28px; text-align:center; }
+    .rank-num.gold   { color:#e8a400; }
+    .rank-num.silver { color:#888; }
+    .rank-num.bronze { color:#b87040; }
+    .rank-info { flex:1; }
+    .rank-name { font-size:14px; font-weight:500; color:var(--text); }
+    .rank-dur  { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim); margin-top:2px; }
+    .rank-bar-wrap { width:100%; max-width:320px; }
+    .rank-loading { text-align:center; color:var(--text-dimmer); font-size:13px; padding:20px 0; }
+    .rank-me-tag { font-size:10px; background:var(--accent); color:#fff; border-radius:6px; padding:2px 6px; margin-left:6px; vertical-align:middle; }
+
+    /* ────── OVERLAYS ────── */
+    .overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; opacity:0; pointer-events:none; transition:opacity .35s ease; }
+    .overlay.active { opacity:1; pointer-events:all; }
+    .o-back { position:fixed; inset:0; background:rgba(242,242,246,0.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+    .o-card { position:relative; z-index:1; width:100%; max-width:320px; background:var(--surface); border:1.5px solid var(--border); border-radius:22px; padding:32px 26px; text-align:center; box-shadow:var(--shadow-lg); }
+    .overlay.active .o-card { animation:popIn .35s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes popIn { from{opacity:0;transform:scale(.88) translateY(12px)} to{opacity:1;transform:scale(1) translateY(0)} }
+
+    .cd-badge { display:inline-block; margin-bottom:18px; padding:5px 14px; background:var(--warning-light); border-radius:20px; font-size:11px; letter-spacing:2px; color:var(--warning); }
+    .cd-timer { font-family:'JetBrains Mono',monospace; font-size:76px; font-weight:300; letter-spacing:-3px; color:var(--warning); line-height:1; }
+    .cd-label { font-size:15px; color:var(--text-dim); margin-top:6px; font-weight:400; }
+    .cd-note { margin-top:20px; font-size:12px; color:var(--text-dimmer); line-height:1.9; }
+
+    .done-icon { font-size:44px; margin-bottom:10px; }
+    .done-h { font-size:28px; font-weight:300; margin-bottom:4px; }
+    .done-s { font-size:13px; color:var(--text-dim); margin-bottom:18px; }
+    .done-dur { font-family:'JetBrains Mono',monospace; font-size:28px; color:var(--accent); margin-bottom:4px; font-weight:300; }
+    .done-dur-l { font-size:11px; color:var(--text-dimmer); margin-bottom:24px; letter-spacing:1px; }
+    .btn-finish { width:100%; padding:18px; margin-bottom:10px; background:var(--success); border:none; border-radius:14px; color:#fff; font-size:22px; font-weight:800; cursor:pointer; letter-spacing:.5px; box-shadow:0 4px 18px var(--success-light); transition:transform .1s,opacity .2s; }
+    .btn-finish:active { transform:scale(.97); }
+    .btn-cont { width:100%; padding:14px; background:transparent; border:1.5px solid var(--border); border-radius:14px; color:var(--text-dim); font-size:14px; cursor:pointer; transition:border-color .2s,color .2s; }
+    .btn-cont:active { border-color:var(--text); color:var(--text); }
+
+    .ot-badge { display:none; position:fixed; top:18px; right:18px; z-index:150; background:var(--danger-light); border:1.5px solid var(--danger); border-radius:20px; padding:5px 13px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--danger); letter-spacing:1px; animation:blink 2s infinite; }
+    .ot-badge.on { display:block; }
+    .btn-float { display:none; position:fixed; bottom:36px; left:50%; transform:translateX(-50%); z-index:150; padding:15px 40px; background:var(--success); border:none; border-radius:100px; color:#fff; font-size:18px; font-weight:800; cursor:pointer; letter-spacing:.5px; box-shadow:0 6px 24px var(--success-light); transition:transform .1s; }
+    .btn-float.on { display:block; }
+    .btn-float:active { transform:translateX(-50%) scale(.97); }
+  </style>
+</head>
+<body>
+
+<!-- ── WELCOME ── -->
+<div class="screen" id="s-welcome">
+  <div class="welcome-emoji" id="welcomeEmoji">👋</div>
+  <div class="welcome-greeting" id="welcomeGreeting">你好，<span class="welcome-name" id="welcomeName"></span></div>
+  <div class="welcome-sub" id="welcomeSub">今天也辛苦了</div>
+  <button class="btn-welcome" onclick="showScreen('s-idle')">去打卡 →</button>
+</div>
+
+<!-- ── IDLE ── -->
+<div class="screen active" id="s-idle">
+  <div>
+    <div class="idle-title">今天，还得上班。</div>
+    <div class="idle-sub" style="margin-top:10px">时间是你的，<br>但今天这段先卖出去吧。</div>
+  </div>
+  <div class="card">
+    <div class="input-label">今日预计下班时间</div>
+    <input type="time" class="time-input" id="endTimeInput" value="18:00">
+  </div>
+  <button class="btn-start" onclick="startWork()">开始卖时间 →</button>
+  <div class="idle-foot">
+    点击后自动计时，关掉重开不会丢失进度<br>
+    <span style="color:var(--text-dimmer);font-size:11px">（以防你自己忘了卖了多少）</span>
+  </div>
+</div>
+
+<!-- ── WORKING ── -->
+<div class="screen" id="s-working">
+  <div class="w-top"><div class="w-dot"></div><span class="w-status">计时中</span></div>
+  <div class="w-elapsed-block">
+    <div class="w-elapsed-label">今日已工作</div>
+    <div class="w-elapsed-card">
+      <div class="w-elapsed-num">
+        <span id="eH">00</span><span class="colon">:</span><span id="eM">00</span><span class="colon">:</span><span id="eS">00</span>
+      </div>
+      <div class="w-elapsed-unit-row"><span>时</span><span>分</span><span>秒</span></div>
+    </div>
+  </div>
+  <div class="w-sep"></div>
+  <div class="w-remaining-block">
+    <div class="w-rem-label">距离下班还有</div>
+    <div class="w-rem-pill">
+      <span class="w-rem-num" id="wRemaining">--</span>
+      <span class="w-rem-unit" id="wRemainingUnit"></span>
+    </div>
+  </div>
+  <div class="w-bottom">
+    <div class="w-clock" id="wClock">--:--:--</div>
+    <div class="w-quote" id="wQuote"></div>
+  </div>
+  <div class="w-action-row">
+    <button class="btn-change-time" onclick="changeEndTime()">修改下班时间</button>
+    <button class="btn-early" onclick="earlyFinish()">提前收工 🏳️</button>
+  </div>
+
+<!-- ── FINISHED ── -->
+<div class="screen" id="s-finished">
+  <div class="fin-icon">🏁</div>
+  <div class="fin-eye">今日打卡完成</div>
+  <div class="fin-dur" id="finDur">00 : 00 : 00</div>
+  <div class="fin-dur-l">今日工作时长</div>
+  <div class="fin-card">
+    <div class="fin-num" id="finWorkers">统计中…</div>
+    <div class="fin-stat">名打工人今天与您<br>花费了相同的时间共同劳动</div>
+  </div>
+  <div class="fin-slogan" id="finSlogan">劳动光荣！（但涨薪不一定。）</div>
+  <div class="fin-actions">
+    <button class="btn-reset" onclick="resetApp()">明天见 →</button>
+    <button class="btn-rank" onclick="showRank()">排行榜 🏆</button>
+  </div>
+</div>
+
+<!-- ── LEADERBOARD ── -->
+<div class="screen" id="s-rank">
+  <div class="rank-header">
+    <button class="btn-back" onclick="showScreen('s-finished')">←</button>
+    <div>
+      <div class="rank-title">今日打工榜</div>
+      <div class="rank-sub">今天谁最能卷</div>
+    </div>
+  </div>
+  <div class="rank-list" id="rankList">
+    <div class="rank-loading">加载中…</div>
+  </div>
+</div>
+
+<!-- ── OVERTIME ── -->
+<div class="ot-badge" id="otBadge">超时进行中</div>
+<button class="btn-float" id="btnFloat" onclick="finishWork()">收工！</button>
+
+<!-- ── CHANGE TIME OVERLAY ── -->
+<div class="overlay" id="ov-changetime">
+  <div class="o-back" onclick="hideOv('ov-changetime')"></div>
+  <div class="o-card">
+    <div class="done-icon">🕐</div>
+    <div class="done-h" style="margin-bottom:16px">修改下班时间</div>
+    <input type="time" class="time-input" id="newEndTimeInput" value="18:00" style="margin-bottom:16px">
+    <button class="btn-finish" style="font-size:16px" onclick="confirmChangeTime()">确认修改</button>
+    <button class="btn-cont" onclick="hideOv('ov-changetime')">取消</button>
+  </div>
+</div>
+
+<!-- ── COUNTDOWN OVERLAY ── -->
+<div class="overlay" id="ov-countdown">
+  <div class="o-back"></div>
+  <div class="o-card">
+    <div class="cd-badge">自由倒计时</div>
+    <div class="cd-timer" id="cdTimer">10:00</div>
+    <div class="cd-label">您就可以下班了</div>
+    <div class="cd-note">坚持住，马上到点了<br><span style="font-size:10px;color:var(--text-dimmer)">今天辛苦了</span></div>
+  </div>
+</div>
+
+<!-- ── DONE OVERLAY ── -->
+<div class="overlay" id="ov-done">
+  <div class="o-back"></div>
+  <div class="o-card">
+    <div class="done-icon">⏰</div>
+    <div class="done-h">到点了</div>
+    <div class="done-s">今天的时间已经卖完了</div>
+    <div class="done-dur" id="doneDur">--:--:--</div>
+    <div class="done-dur-l">今日工作时长</div>
+    <button class="btn-finish" onclick="finishWork()">收工！</button>
+    <button class="btn-cont" onclick="continueWork()">继续工作</button>
+  </div>
+</div>
+
+<script>
+// ══ Supabase ══
+const SB_URL = 'https://gbwclhrlrjnrqewgfgth.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdid2NsaHJscmpucnFld2dmZ3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NzM1NjYsImV4cCI6MjA5NTI0OTU2Nn0.Pza2w7q0iThHLlBKNRgmIBJMDH69dHpwN2Wb3PzwrUA';
+
+async function sbFetch(path, opts={}) {
+  const res = await fetch(SB_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || ''
+    },
+    ...opts
+  });
+  if (!res.ok) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// Generate or retrieve a persistent anonymous user ID
+function getUserId() {
+  let uid = localStorage.getItem('dgUserId');
+  if (!uid) {
+    uid = 'u_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+    localStorage.setItem('dgUserId', uid);
+  }
+  return uid;
+}
+
+// Generate a fun anonymous nickname
+const ADJECTIVES = ['勤劳的','摸鱼的','加班的','佛系的','内卷的','打卡的','苦逼的','努力的','疲惫的','奋斗的'];
+const NOUNS      = ['打工人','社畜','打工仔','上班族','劳动者','码字工','搬砖侠','卷王','工具人','奔波者'];
+function getNickname() {
+  let n = localStorage.getItem('dgNickname');
+  if (!n) {
+    n = ADJECTIVES[Math.floor(Math.random()*ADJECTIVES.length)] + NOUNS[Math.floor(Math.random()*NOUNS.length)];
+    localStorage.setItem('dgNickname', n);
+  }
+  return n;
+}
+
+async function submitSession(durationSec) {
+  const userId = getUserId();
+  const today = new Date().toISOString().slice(0,10);
+  // Upsert: if user already has a record today, update it
+  await sbFetch('work_sessions?on_conflict=user_id,work_date', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates',
+    body: JSON.stringify({
+      user_id: userId,
+      nickname: getNickname(),
+      duration_seconds: durationSec,
+      work_date: today,
+      finished_at: new Date().toISOString()
+    })
+  });
+}
+
+async function fetchSimilarCount(durationSec) {
+  const today = new Date().toISOString().slice(0,10);
+  const low  = durationSec - 1800; // ±30 min
+  const high = durationSec + 1800;
+  const data = await sbFetch(
+    `work_sessions?work_date=eq.${today}&duration_seconds=gte.${low}&duration_seconds=lte.${high}&select=user_id`
+  );
+  return data ? data.length : null;
+}
+
+async function fetchLeaderboard() {
+  const today = new Date().toISOString().slice(0,10);
+  const data = await sbFetch(
+    `work_sessions?work_date=eq.${today}&order=duration_seconds.desc&limit=20&select=user_id,nickname,duration_seconds`
+  );
+  return data || [];
+}
+
+// ══ App State ══
+let APP = {
+  status:'idle', startTime:null, endTime:null,
+  countdownShown:false, doneShown:false, finalElapsed:null
+};
+let ticker = null;
+
+const QUOTES = [
+  "打工是不可能不打工的",
+  "工资涨了吗？没有。继续吗？当然",
+  "不是在上班，就是在上班的路上",
+  "今天也是被资本支配的一天",
+  "又是摸鱼的一天（只是打开了这个 app）",
+  "生活不止眼前的工位，还有……另一个工位",
+  "用时间换金钱，这就是所谓市场经济",
+  "今天也是努力谋生的一天",
+  "每一秒都在为梦想打工",
+  "时间不等人，但老板在等你",
+  "熬过今天，明天继续熬",
+  "上班如上坟，下班如获新生",
+  "时间就是金钱，你的时间，别人的金钱",
+  "又是充实的一天（被迫充实）",
+  "工作使我快乐（我没有别的选择）",
+  "今天的努力，是为了明天继续努力",
+  "社会不养闲人，所以你在这里",
+  "每分每秒都在升华自我（工资没升）",
+  "打工人打工魂，打工都是人上人",
+  "钱不会凭空出现，所以你出现在这里",
+  "又是平凡而伟大的一天",
+  "坚持住，周末快来了（也许）",
+  "是金子，在哪里都会发光（发光也是打工）",
+  "今日事今日毕，明日还有明日事",
+  "偷偷看一眼时间，假装没在摸鱼",
+];
+
+function showWelcome() {
+  const h = new Date().getHours();
+  let emoji, greeting, sub;
+  if (h >= 5 && h < 9) {
+    emoji = '🌅'; greeting = '早上好'; sub = '新的一天，钱包在等你去填满它。';
+  } else if (h >= 9 && h < 12) {
+    emoji = '☀️'; greeting = '上午好'; sub = '精神状态还行吧，先干活。';
+  } else if (h >= 12 && h < 14) {
+    emoji = '🍱'; greeting = '午安'; sub = '吃完了？休息一下，下午还得卷。';
+  } else if (h >= 14 && h < 18) {
+    emoji = '💻'; greeting = '下午好'; sub = '时间过得挺快的，再熬一会儿。';
+  } else if (h >= 18 && h < 21) {
+    emoji = '🌆'; greeting = '傍晚好'; sub = '还在？今天是认真的啊。';
+  } else {
+    emoji = '🌙'; greeting = '晚上好'; sub = '这么晚还在……加班费记得要。';
+  }
+  document.getElementById('welcomeEmoji').textContent = emoji;
+  document.getElementById('welcomeGreeting').innerHTML = `${greeting}，<span class="welcome-name">${getNickname()}</span>`;
+  document.getElementById('welcomeSub').textContent = sub;
+  showScreen('s-welcome');
+}
+
+function init() {
+  getNickname();
+  const raw = localStorage.getItem('dgTimer');
+  if (raw) {
+    try {
+      const s = JSON.parse(raw);
+      if (s.startTime) s.startTime = new Date(s.startTime);
+      if (s.endTime)   s.endTime   = new Date(s.endTime);
+      const today = new Date().toDateString();
+      if (s.startTime && s.startTime.toDateString() === today) {
+        APP = s;
+        if (APP.status === 'finished') { renderFinished(); showScreen('s-finished'); return; }
+        if (APP.status === 'working' || APP.status === 'overtime') {
+          setQuote(); showScreen('s-working');
+          if (APP.status === 'overtime') {
+            document.getElementById('otBadge').classList.add('on');
+            document.getElementById('btnFloat').classList.add('on');
+          }
+          startTicker(); return;
+        }
+      }
+    } catch(e) {}
+  }
+  // Check if we should show welcome (first open of the day)
+  const lastWelcome = localStorage.getItem('dgLastWelcome');
+  const today = new Date().toDateString();
+  if (lastWelcome !== today) {
+    localStorage.setItem('dgLastWelcome', today);
+    showWelcome();
+  } else {
+    showScreen('s-idle');
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showOv(id)  { document.getElementById(id).classList.add('active'); }
+function hideOv(id)  { document.getElementById(id).classList.remove('active'); }
+function setQuote()  { document.getElementById('wQuote').textContent = QUOTES[Math.floor(Math.random()*QUOTES.length)]; }
+function pad(n)      { return String(n).padStart(2,'0'); }
+function fmtHMS(s)   { return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`; }
+function fmtSpaced(s){ return `${pad(Math.floor(s/3600))} : ${pad(Math.floor((s%3600)/60))} : ${pad(s%60)}`; }
+function fmtHMSCN(s) {
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(h>0) return `${h}小时${pad(m)}分${pad(sec)}秒`;
+  if(m>0) return `${m}分${pad(sec)}秒`;
+  return `${sec}秒`;
+}
+function save() { localStorage.setItem('dgTimer', JSON.stringify(APP)); }
+
+function startWork() {
+  const val = document.getElementById('endTimeInput').value;
+  if (!val) { alert('请先设置今天的下班时间'); return; }
+  const [h,m] = val.split(':').map(Number);
+  const end = new Date(); end.setHours(h,m,0,0);
+  APP = { status:'working', startTime:new Date(), endTime:end, countdownShown:false, doneShown:false, finalElapsed:null };
+  setQuote(); save(); showScreen('s-working'); startTicker();
+}
+
+function startTicker() {
+  if (ticker) clearInterval(ticker);
+  tick(); ticker = setInterval(tick, 1000);
+}
+
+function tick() {
+  const now = new Date();
+  const elapsedSec = Math.floor((now - APP.startTime) / 1000);
+  const remainSec  = Math.floor((APP.endTime - now) / 1000);
+  document.getElementById('wClock').textContent = now.toLocaleTimeString('zh-CN',{hour12:false});
+  document.getElementById('eH').textContent = pad(Math.floor(elapsedSec/3600));
+  document.getElementById('eM').textContent = pad(Math.floor((elapsedSec%3600)/60));
+  document.getElementById('eS').textContent = pad(elapsedSec%60);
+  const remNumEl  = document.getElementById('wRemaining');
+  const remUnitEl = document.getElementById('wRemainingUnit');
+  const pill = remNumEl.closest('.w-rem-pill');
+  if (remainSec > 0) {
+    const rh=Math.floor(remainSec/3600), rm=Math.floor((remainSec%3600)/60), rs=remainSec%60;
+    if (remainSec<=600) {
+      pill.style.background='var(--warning-light)';
+      remNumEl.style.color='var(--warning)'; remUnitEl.style.color='var(--warning)';
+    } else {
+      pill.style.background='var(--accent-light)';
+      remNumEl.style.color='var(--accent)'; remUnitEl.style.color='var(--accent)';
+    }
+    if (rh>0) { remNumEl.textContent=`${rh}小时${pad(rm)}分`; remUnitEl.textContent=''; }
+    else if (rm>0) { remNumEl.textContent=`${rm}分${pad(rs)}秒`; remUnitEl.textContent=''; }
+    else { remNumEl.textContent=`${rs}`; remUnitEl.textContent='秒'; }
+    if (remainSec<=600 && !APP.countdownShown) { APP.countdownShown=true; showOv('ov-countdown'); save(); }
+    if (APP.countdownShown && remainSec<=600) {
+      document.getElementById('cdTimer').textContent=`${pad(Math.floor(remainSec/60))}:${pad(remainSec%60)}`;
+    }
+  } else {
+    if (!APP.doneShown && APP.status!=='overtime') {
+      APP.doneShown=true; hideOv('ov-countdown');
+      document.getElementById('doneDur').textContent=fmtHMS(elapsedSec);
+      showOv('ov-done'); save();
+    }
+    if (APP.status==='overtime') {
+      const ot=Math.abs(remainSec);
+      pill.style.background='var(--danger-light)';
+      remNumEl.style.color='var(--danger)'; remUnitEl.style.color='var(--danger)';
+      remNumEl.textContent=`超时${pad(Math.floor(ot/3600))}:${pad(Math.floor((ot%3600)/60))}:${pad(ot%60)}`;
+      remUnitEl.textContent='';
+    }
+  }
+}
+
+function earlyFinish() {
+  if (!confirm('确定提前收工？')) return;
+  finishWork();
+}
+
+function changeEndTime() {
+  // Pre-fill with current end time
+  const h = APP.endTime.getHours(), m = APP.endTime.getMinutes();
+  document.getElementById('newEndTimeInput').value = `${pad(h)}:${pad(m)}`;
+  showOv('ov-changetime');
+}
+
+function confirmChangeTime() {
+  const val = document.getElementById('newEndTimeInput').value;
+  if (!val) return;
+  const [h,m] = val.split(':').map(Number);
+  const newEnd = new Date();
+  newEnd.setHours(h,m,0,0);
+  APP.endTime = newEnd;
+  APP.countdownShown = false;
+  APP.doneShown = false;
+  save();
+  hideOv('ov-changetime');
+}
+
+function continueWork() {
+  hideOv('ov-done'); APP.status='overtime';
+  document.getElementById('otBadge').classList.add('on');
+  document.getElementById('btnFloat').classList.add('on');
+  save();
+}
+
+function finishWork() {
+  clearInterval(ticker);
+  APP.finalElapsed = Math.floor((new Date()-APP.startTime)/1000);
+  APP.status='finished'; save();
+  hideOv('ov-done'); hideOv('ov-countdown');
+  document.getElementById('otBadge').classList.remove('on');
+  document.getElementById('btnFloat').classList.remove('on');
+  renderFinished();
+  showScreen('s-finished');
+  // Submit to Supabase in background
+  submitSession(APP.finalElapsed);
+}
+
+async function renderFinished() {
+  const e = APP.finalElapsed || Math.floor((new Date()-APP.startTime)/1000);
+  document.getElementById('finDur').textContent = fmtSpaced(e);
+  const ot = e - Math.floor((APP.endTime-APP.startTime)/1000);
+  document.getElementById('finSlogan').textContent =
+    ot>3600 ? `今天多劳动了 ${Math.floor(ot/3600)} 小时 ${Math.floor((ot%3600)/60)} 分钟。\n公司感谢您，但不一定会说。`
+    : ot>0  ? `今天还加了 ${Math.floor(ot/60)} 分钟班。\n劳动光荣！（但涨薪不一定。）`
+    :          `准时下班，是打工人最后的尊严。\n明天继续。`;
+
+  // Fetch real similar count from Supabase
+  try {
+    const count = await fetchSimilarCount(e);
+    if (count !== null) {
+      document.getElementById('finWorkers').textContent = count.toLocaleString('zh-CN');
+    } else {
+      // Fallback to estimated number
+      document.getElementById('finWorkers').textContent =
+        Math.max(8000,Math.min(999999,Math.floor(48000+e/3600*4300+Math.sin(e*0.00031)*22000))).toLocaleString('zh-CN');
+    }
+  } catch(err) {
+    document.getElementById('finWorkers').textContent =
+      Math.max(8000,Math.min(999999,Math.floor(48000+e/3600*4300+Math.sin(e*0.00031)*22000))).toLocaleString('zh-CN');
+  }
+}
+
+async function showRank() {
+  showScreen('s-rank');
+  const list = document.getElementById('rankList');
+  list.innerHTML = '<div class="rank-loading">加载中…</div>';
+  try {
+    const rows = await fetchLeaderboard();
+    if (!rows.length) { list.innerHTML='<div class="rank-loading">今天还没有人收工，你是第一个？</div>'; return; }
+    const myId = getUserId();
+    list.innerHTML = rows.map((r,i) => {
+      const isMe = r.user_id === myId;
+      const medal = i===0 ? 'gold' : i===1 ? 'silver' : i===2 ? 'bronze' : '';
+      const numDisplay = i<3 ? ['🥇','🥈','🥉'][i] : (i+1);
+      return `
+        <div class="rank-item ${isMe?'me':''}">
+          <div class="rank-num ${medal}">${numDisplay}</div>
+          <div class="rank-info">
+            <div class="rank-name">${r.nickname || '匿名打工人'}${isMe?'<span class="rank-me-tag">我</span>':''}</div>
+            <div class="rank-dur">${fmtHMSCN(r.duration_seconds)}</div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML='<div class="rank-loading">加载失败，稍后再试</div>';
+  }
+}
+
+function resetApp() {
+  localStorage.removeItem('dgTimer');
+  APP={status:'idle',startTime:null,endTime:null,countdownShown:false,doneShown:false,finalElapsed:null};
+  const pill = document.getElementById('wRemaining').closest('.w-rem-pill');
+  if(pill){ pill.style.background=''; }
+  showScreen('s-idle');
+}
+
+init();
+</script>
+</body>
+</html>
